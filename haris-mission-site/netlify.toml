@@ -1,4 +1,0 @@
-# Haris-1 mission dashboard
-[build]
-  publish = "public"              # the dashboard page (unchanged)
-  functions = "netlify/functions" # the backend: /api/telemetry, /api/groundstation, /api/latest
