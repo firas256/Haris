@@ -1,5 +1,0 @@
-# The site lives in the haris-mission-site folder; build from there.
-[build]
-  base = "haris-mission-site"
-  publish = "public"
-  functions = "netlify/functions"
