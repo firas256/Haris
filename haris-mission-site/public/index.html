@@ -82,6 +82,15 @@ h1 { font-family: var(--serif); font-weight: 400; font-size: 1.9rem; margin: 0; 
   .layout { grid-template-columns: minmax(0, 1fr); grid-template-areas: "warn" "sats" "objs"; }
   .layout > .warn-card { contain: none; min-height: 0; max-height: 420px; }
 }
+/* data source switch (Replay | Live) */
+.srcsw { display: flex; align-items: center; gap: 6px; margin-right: 6px; }
+.src-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: rgba(235,242,255,.7); }
+.src-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #7a8394; }
+.src-status.on .dot { background: #4cc38a; box-shadow: 0 0 6px #4cc38a; }
+.sbtn:disabled { opacity: .4; cursor: not-allowed; }
+.pill.live::before { background: var(--green); }
+.pill.stale::before { background: var(--orange); }
+.nc { color: var(--muted) !important; font-weight: 500; }
 /* cards & tables */
 .objs-card table, .sats-card table { font-size: 13.5px; }
 .objs-card td, .objs-card th { padding-inline: 6px; }
@@ -166,7 +175,7 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
 <body>
 <div class="wrap">
   <header>
-    <div class="headrow"><h1>Haris-1 mission dashboard</h1><span class="pill">Showing sample data, replayed</span></div>
+    <div class="headrow"><h1>Haris-1 mission dashboard</h1><span class="pill" id="pill">Showing sample data, replayed</span></div>
     <p class="sub">Hover a path to see when an object gets there. Click a flashing light to see when two objects meet.</p>
   </header>
 
@@ -189,11 +198,18 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
     <div class="bar">
       <div class="clock">Mission time <b id="clock">--:--:--</b> UTC</div>
       <div class="ctrls">
-        <span class="muted-l">Speed</span>
-        <button class="sbtn" type="button" data-speed="1" aria-pressed="false">1×</button>
-        <button class="sbtn" type="button" data-speed="10" aria-pressed="false">10×</button>
-        <button class="sbtn" type="button" data-speed="60" aria-pressed="true">60×</button>
-        <button class="sbtn" type="button" id="restart">Restart</button>
+        <div class="srcsw" role="group" aria-label="Data source">
+          <button class="sbtn" type="button" id="src-replay" aria-pressed="true">Replay</button>
+          <button class="sbtn" type="button" id="src-live" aria-pressed="false" disabled title="Haris-1 is offline">Live</button>
+          <span class="src-status" id="src-status"><span class="dot"></span><span id="src-text">Haris-1 offline</span></span>
+        </div>
+        <span id="speed-group" class="ctrls">
+          <span class="muted-l">Speed</span>
+          <button class="sbtn" type="button" data-speed="1" aria-pressed="false">1×</button>
+          <button class="sbtn" type="button" data-speed="10" aria-pressed="false">10×</button>
+          <button class="sbtn" type="button" data-speed="60" aria-pressed="true">60×</button>
+          <button class="sbtn" type="button" id="restart">Restart</button>
+        </span>
         <button class="sbtn primary" type="button" id="add-sat">Add satellite</button>
       </div>
     </div>
@@ -232,7 +248,7 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
 
   <section class="card" aria-labelledby="sens-h">
     <h2 id="sens-h">Onboard sensors</h2>
-    <p class="note">Simulated readings that follow the replay, until the CubeSat is connected. Distances are at demo scale.</p>
+    <p class="note" id="sens-note">Simulated readings that follow the replay, until the CubeSat is connected. Distances are at demo scale.</p>
     <div class="sensors">
       <div class="sgroup">
         <h3>Proximity</h3>
@@ -331,13 +347,14 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
 
   // ---------- state ----------
   const S = {
+    src: 'replay',
     speed: 60, base: 0, t0: performance.now(),
     view: { yaw: -0.6, tilt: 0.38, zoom: 1 }, anim: null,
     hidden: new Set(), selected: null, pinned: null,
     sats: [], events: [], editing: null
   };
   const DEFAULT_VIEW = { yaw: -0.6, tilt: 0.38, zoom: 1 };
-  const elapsed = () => S.base + (performance.now() - S.t0) * S.speed;      // ms since epoch
+  const elapsed = () => S.src === 'live' ? Date.now() - EPOCH : S.base + (performance.now() - S.t0) * S.speed;      // ms since epoch
   const nowMs = () => EPOCH + elapsed();
   try { const saved = JSON.parse(localStorage.getItem(STORE) || '[]'); if (Array.isArray(saved)) S.sats = saved; } catch (e) { S.sats = []; }
   const saveSats = () => { try { localStorage.setItem(STORE, JSON.stringify(S.sats)); } catch (e) { /* storage unavailable: keep in memory */ } };
@@ -533,11 +550,11 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     stars.forEach(([x, y, a]) => { ctx.fillStyle = `rgba(255,255,255,${a * 0.6})`; ctx.fillRect(x * W, y * H, 1.2, 1.2); });
     picks = [];
     drawEarth(t);
-    debris.forEach((d) => { if (lastNow != null && d.detectedAt > lastNow && d.detectedAt <= now) pulses.set(d.id, performance.now()); });
+    if (S.src === 'replay') debris.forEach((d) => { if (lastNow != null && d.detectedAt > lastNow && d.detectedAt <= now) pulses.set(d.id, performance.now()); });
     if (lastNow != null && Math.abs(now - lastNow) > 0) renderWarnings(false);
     lastNow = now;
     const any = S.selected != null, fade = (id) => any && S.selected !== id;
-    const liveDebris = debris.filter((d) => isDetected(d, now) && !S.hidden.has(d.id));
+    const liveDebris = S.src === 'live' ? [] : debris.filter((d) => isDetected(d, now) && !S.hidden.has(d.id));
     const shownSats = allSats().filter((s) => !S.hidden.has(s.id));
     shownSats.forEach((s) => drawPath(s, s.color, false, fade(s.id)));
     liveDebris.forEach((d) => { const w = worstFor(d.id, now); drawPath(d, w ? sevColor(w.sev.key) : DEBRIS_COLOR, true, fade(d.id)); });
@@ -551,7 +568,7 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     shownSats.filter((s) => s.kind === 'sat').forEach((s) => { const q = project(posT(s.orbit, t)); drawDiamond(q, s.color, s.name, fade(s.id)); marks.push({ kind: 'obj', x: q.x, y: q.y, obj: s }); });
     if (!S.hidden.has('sat')) { const q = drawCube(cubesat.orbit, cubesat.orbit.u0 + cubesat.orbit.n * t, fade('sat')); marks.push({ kind: 'obj', x: q.x, y: q.y, obj: cubesat }); }
     picks = marks.concat(picks);
-    visibleEvents(now).forEach((e) => drawBeacon(e, now));
+    if (S.src === 'replay') visibleEvents(now).forEach((e) => drawBeacon(e, now));
     placePin(now, t);
     if (hover && !drag) showTip(hover.x, hover.y, now, t);
     $('clock').textContent = hms(now);
@@ -694,6 +711,7 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
   // ---------- detections table ----------
   let detKey = '';
   const renderDetections = (force) => {
+    if (S.src === 'live') return renderDetectionsLive(force);
     const now = nowMs();
     const rows = debris.filter((d) => isDetected(d, now)).sort((a, b) => b.detectedAt - a.detectedAt);
     $('det-empty').hidden = rows.length > 0;
@@ -716,6 +734,7 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
   // ---------- warnings list + alert chip ----------
   let warnKey = '';
   const renderWarnings = (force) => {
+    if (S.src === 'live') return renderWarningsLive(force);
     const now = nowMs();
     const list = visibleEvents(now).concat(knownEvents(now).filter((e) => e.t < now - 120000 && e.t >= now - 900000 && !S.hidden.has(e.sat) && !S.hidden.has(e.deb)))
       .filter((e, i, a) => a.indexOf(e) === i).sort((a, b) => a.t - b.t);
@@ -826,6 +845,7 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
   const grid = $('tof-grid'); for (let i = 0; i < 16; i++) grid.append(document.createElement('span'));
   const setBar = (el, frac) => { el.style.width = `${Math.round(Math.max(0, Math.min(1, frac)) * 100)}%`; };
   const renderSensors = () => {
+    if (S.src === 'live') return renderSensorsLive();
     const now = nowMs(), st = sensorState(now, elapsed() / 1000);
     [['left', 'us-left'], ['right', 'us-right'], ['back', 'us-back']].forEach(([k, id]) => {
       const row = $(id), v = st.us[k];
@@ -852,6 +872,141 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     $('lux-val').textContent = `${Math.round(st.light)} %`; setBar($('lux-bar'), st.light / 100);
   };
 
+  // ---------- live data from Haris-1 (backend /api/latest) ----------
+  const LIVE = { reachable: false, online: false, age: null, data: null, events: [] };
+  const SEVL = { red: 'Collision risk', orange: 'Close approach', yellow: 'Watch', clear: 'Clear' };
+  const MODEL = { SCAN: 'Scanning', TURN: 'Turning to object', TRACK: 'Tracking', WARN: 'Warning' };
+  const SIDEL = { left: 'Left ultrasonic', right: 'Right ultrasonic', back: 'Back ultrasonic', front: 'Front tracker' };
+  const TEXT = { warnsEmpty: $('warns-empty').textContent, detEmpty: $('det-empty').textContent, sensNote: $('sens-note').textContent };
+  const setVal = (id, text, missing) => { const el = $(id); el.textContent = text; el.classList.toggle('nc', !!missing); };
+  const evTime = (e) => Date.parse(e.received_at || '') || 0;
+
+  const updateSourceUI = () => {
+    const live = S.src === 'live', on = LIVE.online;
+    $('src-replay').setAttribute('aria-pressed', String(!live));
+    $('src-live').setAttribute('aria-pressed', String(live));
+    $('src-live').disabled = !on && !live;
+    $('src-live').title = on ? 'Show live data from Haris-1' : 'Haris-1 is offline';
+    $('src-status').classList.toggle('on', on);
+    $('src-text').textContent = on ? 'Haris-1 online' : (LIVE.age != null ? `Haris-1 offline, last seen ${Math.round(LIVE.age)} s ago` : 'Haris-1 offline');
+    $('speed-group').hidden = live;
+    const pill = $('pill');
+    pill.classList.toggle('live', live && on); pill.classList.toggle('stale', live && !on);
+    pill.textContent = !live ? 'Showing sample data, replayed' : on ? 'Live data from Haris-1' : 'Live: connection lost, showing last readings';
+    $('sens-note').textContent = live ? 'Live readings from Haris-1, updated every second. Distances are real, at demo scale.' : TEXT.sensNote;
+  };
+
+  const setSource = (src) => {
+    if (src === 'live' && !LIVE.online) return;
+    S.src = src; S.selected = null; setPin(null); lastNow = null;
+    if (src === 'replay') {
+      S.base = 0; S.t0 = performance.now();
+      document.querySelectorAll('.nc').forEach((el) => el.classList.remove('nc'));
+      $('warns-empty').textContent = TEXT.warnsEmpty; $('det-empty').textContent = TEXT.detEmpty;
+    }
+    warnKey = ''; detKey = '';
+    updateSourceUI(); renderWarnings(true); renderDetections(true); renderSensors();
+  };
+  $('src-replay').addEventListener('click', () => setSource('replay'));
+  $('src-live').addEventListener('click', () => setSource('live'));
+
+  const poll = async () => {
+    try {
+      const r = await fetch('/api/latest', { cache: 'no-store' });
+      if (!r.ok) throw new Error(String(r.status));
+      const j = await r.json();
+      LIVE.reachable = true; LIVE.online = !!j.online; LIVE.age = j.age_s;
+      LIVE.data = j.latest || null; LIVE.events = Array.isArray(j.events) ? j.events : [];
+    } catch (e) { LIVE.reachable = false; LIVE.online = false; }
+    updateSourceUI();
+    if (S.src === 'live') { renderWarnings(false); renderDetections(false); }
+    setTimeout(poll, S.src === 'live' ? 1000 : 3000);
+  };
+
+  let liveWarnKey = '';
+  const renderWarningsLive = (force) => {
+    const now = Date.now();
+    const list = LIVE.events.slice(-30).reverse();
+    const key = list.map((e) => evTime(e)).join(',') + Math.floor(now / 15000);
+    if (key !== liveWarnKey || force) {
+      liveWarnKey = key;
+      $('warns-empty').textContent = 'No events from Haris-1 yet.';
+      $('warns-empty').hidden = list.length > 0;
+      $('warns').replaceChildren(...list.map((e) => {
+        const li = document.createElement('li'), b = document.createElement('button'), lt = document.createElement('span'), tx = document.createElement('span');
+        const sev = SEVL[e.sev] ? e.sev : 'clear', recent = now - evTime(e) < 60000;
+        b.type = 'button'; b.className = 'warn' + (recent ? '' : ' past');
+        lt.className = 'light' + (sev === 'clear' ? '' : ` sev-${sev}`) + (recent && sev !== 'clear' ? ' blink' : '');
+        const a1 = document.createElement('div'); a1.className = 'w1'; a1.textContent = `${SEVL[sev]}: object on the ${e.side || 'front'} side`;
+        const miss = e.miss_cm != null ? `passes ${Number(e.miss_cm).toFixed(0)} cm away` : '';
+        const spd = e.speed_cms ? `${Number(e.speed_cms).toFixed(0)} cm/s` : '';
+        const a2 = document.createElement('div'); a2.className = 'w2'; a2.textContent = [miss, spd, e.note, `${hms(evTime(e))} UTC`].filter(Boolean).join(', ');
+        tx.append(a1, a2); b.append(lt, tx); li.append(b); return li;
+      }));
+    }
+    const recentWorst = LIVE.events.filter((e) => now - evTime(e) < 60000 && SEVL[e.sev] && e.sev !== 'clear')
+      .sort((a, b) => ['red', 'orange', 'yellow'].indexOf(a.sev) - ['red', 'orange', 'yellow'].indexOf(b.sev))[0];
+    $('warn-light').className = 'light' + (recentWorst ? ` sev-${recentWorst.sev} blink` : '');
+    const chip = $('chip');
+    if (recentWorst) {
+      chip.hidden = false; $('chip-light').className = `light blink sev-${recentWorst.sev}`;
+      $('chip-text').textContent = `${SEVL[recentWorst.sev]}: object on the ${recentWorst.side || 'front'} side, ${Number(recentWorst.miss_cm || 0).toFixed(0)} cm`;
+      chip.onclick = null;
+    } else chip.hidden = true;
+  };
+
+  let liveDetKey = '';
+  const renderDetectionsLive = (force) => {
+    const list = LIVE.events.slice(-20).reverse();
+    const key = list.map((e) => evTime(e)).join(',');
+    $('det-empty').textContent = 'No detections from Haris-1 yet.';
+    $('det-empty').hidden = list.length > 0;
+    if (key === liveDetKey && !force) return;
+    liveDetKey = key;
+    const n0 = LIVE.events.length;
+    $('det-rows').replaceChildren(...list.map((e, i) => {
+      const tr = document.createElement('tr'), sev = SEVL[e.sev] ? e.sev : 'clear';
+      tr.append(cell(''), cell(`#${n0 - i}`), cell(hms(evTime(e))), cell(SIDEL[e.side] || e.side || '—'), cell('—'),
+        cell(e.speed_cms ? `${Number(e.speed_cms).toFixed(0)} cm/s` : '—'), cell(e.miss_cm != null ? `${Number(e.miss_cm).toFixed(0)} cm` : '—'));
+      const td = document.createElement('td'), sp = document.createElement('span'), lt = document.createElement('span');
+      sp.className = 'risk'; lt.className = 'light' + (sev === 'clear' ? '' : ` sev-${sev}`); sp.append(lt, document.createTextNode(SEVL[sev])); td.append(sp); tr.append(td);
+      return tr;
+    }));
+  };
+
+  const renderSensorsLive = () => {
+    const d = LIVE.data || {}, ok = d.ok || {};
+    const us = Array.isArray(d.us_cm) ? d.us_cm : [null, null, null];
+    [['us-left', 0], ['us-right', 1], ['us-back', 2]].forEach(([id, i]) => {
+      const row = $(id), v = us[i], has = typeof v === 'number' && v > 0;
+      row.classList.toggle('hot', has && v < 200);
+      setBar(row.querySelector('.sbar span'), has ? 1 - v / 400 : 0);
+      const b = row.querySelector('b'); b.textContent = has ? `${(v / 100).toFixed(2)} m` : (v == null ? 'Not connected' : 'No echo'); b.classList.toggle('nc', v == null);
+    });
+    const g = Array.isArray(d.tof_grid) ? d.tof_grid : null;
+    [...grid.children].forEach((c, i) => {
+      const mm = g ? g[i] : -1;
+      c.style.background = mm > 0 ? `rgba(240,140,46,${(0.25 + 0.7 * (1 - Math.min(mm, 2000) / 2000)).toFixed(2)})` : '';
+    });
+    if (!g) setVal('tof-val', 'Not connected', true);
+    else setVal('tof-val', d.tof_mm > 0 ? `${(d.tof_mm / 1000).toFixed(2)} m` : 'Clear', false);
+    const yaw = Number(d.yaw) || 0;
+    $('dial-cube').setAttribute('transform', `rotate(${yaw.toFixed(1)})`);
+    $('yaw-val').textContent = `${Math.round(yaw)}°`;
+    $('yaw-txt').textContent = (Math.abs(yaw) < 1 ? 'Facing forward' : yaw < 0 ? 'Turned left' : 'Turned right') + (d.heading != null ? `, compass ${Math.round(d.heading)}°` : '');
+    setVal('mode-val', MODEL[d.mode] || d.mode || '—', !d.mode);
+    if (d.batt_pct == null) { setVal('batt-val', 'Not connected', true); setVal('vbat-val', 'Not connected', true); setBar($('batt-bar'), 0); }
+    else { setVal('batt-val', `${Number(d.batt_pct).toFixed(0)} %`); setVal('vbat-val', `${Number(d.batt_v).toFixed(2)} V`); setBar($('batt-bar'), d.batt_pct / 100); }
+    if (d.solar_mw == null) { setVal('solar-val', 'Not connected', true); setVal('isol-val', 'Not connected', true); }
+    else { setVal('solar-val', `${(d.solar_mw / 1000).toFixed(2)} W`); setVal('isol-val', `${Number(d.solar_ma).toFixed(0)} mA`); }
+    if (d.light_pct == null) setVal('sun-val', 'Not connected', true);
+    else setVal('sun-val', d.light_pct >= 30 ? 'Light on top face' : 'Dark on top face');
+    if (d.temp_c == null) { setVal('temp-val', 'Not connected', true); setBar($('temp-bar'), 0); }
+    else { setVal('temp-val', `${Number(d.temp_c).toFixed(1)} °C`); setBar($('temp-bar'), (d.temp_c + 10) / 50); }
+    if (d.light_pct == null) { setVal('lux-val', 'Not connected', true); setBar($('lux-bar'), 0); }
+    else { setVal('lux-val', `${Math.round(d.light_pct)} %`); setBar($('lux-bar'), d.light_pct / 100); }
+  };
+
   // ---------- start ----------
   size();
   let rt = 0; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(size, 100); });
@@ -859,6 +1014,7 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
   renderDetections(true);
   setInterval(() => renderDetections(false), 300);
   renderSensors(); setInterval(renderSensors, 120);
+  updateSourceUI(); poll();
   requestAnimationFrame(frame);
 })();
 </script>
