@@ -91,6 +91,25 @@ h1 { font-family: var(--serif); font-weight: 400; font-size: 1.9rem; margin: 0; 
 .pill.live::before { background: var(--green); }
 .pill.stale::before { background: var(--orange); }
 .nc { color: var(--muted) !important; font-weight: 500; }
+[hidden] { display: none !important; }
+/* live health strip, thresholds, trends, stale state (Live mode only) */
+.health { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+.htile { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--hc, var(--line)); border-radius: var(--radius); padding: 9px 12px; display: grid; gap: 1px; min-width: 0; }
+.htile .hl { font-size: 12px; color: var(--muted); }
+.htile .hv { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.htile .hs { font-size: 12px; font-weight: 600; color: var(--hc, var(--muted)); }
+.st-ok { --hc: var(--green); } .st-warn { --hc: var(--orange); } .st-crit { --hc: var(--red); } .st-none { --hc: var(--muted); }
+.v-warn { color: var(--orange) !important; } .v-crit { color: var(--red) !important; }
+.is-stale .hv, .is-stale .srow b, .is-stale .big, .is-stale .chart canvas, .is-stale .cv { opacity: .45; }
+.is-stale .htile.link .hv { opacity: 1; }
+.stale-badge { margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--orange); border: 1px solid var(--orange); border-radius: 999px; padding: 1px 8px; vertical-align: middle; }
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.chart { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; display: grid; gap: 6px; min-width: 0; }
+.chart .ct { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.chart .cv { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart canvas { width: 100%; height: 110px; display: block; }
+.chart .ck { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+.chart .ck i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
 /* cards & tables */
 .objs-card table, .sats-card table { font-size: 13.5px; }
 .objs-card td, .objs-card th { padding-inline: 6px; }
@@ -179,6 +198,16 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
     <p class="sub">Hover a path to see when an object gets there. Click a flashing light to see when two objects meet.</p>
   </header>
 
+  <section class="health" id="health" hidden aria-label="Haris-1 health at a glance">
+    <div class="htile link" id="h-link"><span class="hl">Link</span><span class="hv" id="h-link-v">—</span><span class="hs" id="h-link-s">—</span></div>
+    <div class="htile" id="h-age"><span class="hl">Last packet</span><span class="hv" id="h-age-v">—</span><span class="hs" id="h-age-s">—</span></div>
+    <div class="htile" id="h-rssi"><span class="hl">WiFi signal</span><span class="hv" id="h-rssi-v">—</span><span class="hs" id="h-rssi-s">—</span></div>
+    <div class="htile" id="h-batt"><span class="hl">Battery</span><span class="hv" id="h-batt-v">—</span><span class="hs" id="h-batt-s">—</span></div>
+    <div class="htile" id="h-temp"><span class="hl">Temperature</span><span class="hv" id="h-temp-v">—</span><span class="hs" id="h-temp-s">—</span></div>
+    <div class="htile" id="h-mode"><span class="hl">Mode</span><span class="hv" id="h-mode-v">—</span><span class="hs" id="h-mode-s">—</span></div>
+    <div class="htile" id="h-up"><span class="hl">Uptime</span><span class="hv" id="h-up-v">—</span><span class="hs" id="h-up-s">—</span></div>
+  </section>
+
   <section class="stage" aria-label="Orbit view">
     <div class="view" id="view">
       <canvas id="cv" role="img" aria-label="Earth with the orbits of Haris-1, added satellites and detected objects"></canvas>
@@ -215,6 +244,16 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
     </div>
   </section>
 
+  <section class="card" id="trends" hidden aria-labelledby="trends-h">
+    <h2 id="trends-h">Trends, last 5 minutes</h2>
+    <div class="charts">
+      <div class="chart"><div class="ct"><span>Battery voltage</span><span class="cv" id="c-batt-v">—</span></div><canvas id="c-batt" aria-label="Battery voltage over the last 5 minutes"></canvas><div class="ck"><span><i style="background:var(--orange)"></i>warning 3.5 V</span><span><i style="background:var(--red)"></i>critical 3.3 V</span></div></div>
+      <div class="chart"><div class="ct"><span>Temperature</span><span class="cv" id="c-temp-v">—</span></div><canvas id="c-temp" aria-label="Temperature over the last 5 minutes"></canvas><div class="ck"><span><i style="background:var(--orange)"></i>warning 45 °C</span><span><i style="background:var(--red)"></i>critical 60 °C</span></div></div>
+      <div class="chart"><div class="ct"><span>Solar power</span><span class="cv" id="c-solar-v">—</span></div><canvas id="c-solar" aria-label="Solar power over the last 5 minutes"></canvas></div>
+      <div class="chart"><div class="ct"><span>Ultrasonic distance</span><span class="cv" id="c-us-v">—</span></div><canvas id="c-us" aria-label="Ultrasonic distances over the last 5 minutes"></canvas><div class="ck"><span><i style="background:#3b82f6"></i>left</span><span><i style="background:#14b8a6"></i>right</span><span><i style="background:#a855f7"></i>back</span></div></div>
+    </div>
+  </section>
+
   <div class="layout">
     <section class="card warn-card" aria-labelledby="warn-h">
       <h2 id="warn-h"><span class="light" id="warn-light"></span>Collision warnings</h2>
@@ -246,8 +285,8 @@ dialog::backdrop { background: rgba(5,10,20,.55); }
   </section>
   </div>
 
-  <section class="card" aria-labelledby="sens-h">
-    <h2 id="sens-h">Onboard sensors</h2>
+  <section class="card" id="sens-card" aria-labelledby="sens-h">
+    <h2 id="sens-h">Onboard sensors<span class="stale-badge" id="stale-badge" hidden></span></h2>
     <p class="note" id="sens-note">Simulated readings that follow the replay, until the CubeSat is connected. Distances are at demo scale.</p>
     <div class="sensors">
       <div class="sgroup">
@@ -873,7 +912,8 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
   };
 
   // ---------- live data from Haris-1 (backend /api/latest) ----------
-  const LIVE = { reachable: false, online: false, age: null, data: null, events: [] };
+  const LIVE = { reachable: false, online: false, age: null, data: null, events: [], history: [], fetchedAt: 0 };
+  let pollCount = 0;
   const SEVL = { red: 'Collision risk', orange: 'Close approach', yellow: 'Watch', clear: 'Clear' };
   const MODEL = { SCAN: 'Scanning', TURN: 'Turning to object', TRACK: 'Tracking', WARN: 'Warning' };
   const SIDEL = { left: 'Left ultrasonic', right: 'Right ultrasonic', back: 'Back ultrasonic', front: 'Front tracker' };
@@ -890,6 +930,8 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     $('src-status').classList.toggle('on', on);
     $('src-text').textContent = on ? 'Haris-1 online' : (LIVE.age != null ? `Haris-1 offline, last seen ${Math.round(LIVE.age)} s ago` : 'Haris-1 offline');
     $('speed-group').hidden = live;
+    $('health').hidden = !live; $('trends').hidden = !live;
+    if (!live) { $('stale-badge').hidden = true; ['health', 'trends', 'sens-card'].forEach((id) => $(id).classList.remove('is-stale')); }
     const pill = $('pill');
     pill.classList.toggle('live', live && on); pill.classList.toggle('stale', live && !on);
     pill.textContent = !live ? 'Showing sample data, replayed' : on ? 'Live data from Haris-1' : 'Live: connection lost, showing last readings';
@@ -901,25 +943,29 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     S.src = src; S.selected = null; setPin(null); lastNow = null;
     if (src === 'replay') {
       S.base = 0; S.t0 = performance.now();
-      document.querySelectorAll('.nc').forEach((el) => el.classList.remove('nc'));
+      document.querySelectorAll('.nc, .v-warn, .v-crit').forEach((el) => el.classList.remove('nc', 'v-warn', 'v-crit'));
       $('warns-empty').textContent = TEXT.warnsEmpty; $('det-empty').textContent = TEXT.detEmpty;
     }
     warnKey = ''; detKey = '';
     updateSourceUI(); renderWarnings(true); renderDetections(true); renderSensors();
+    if (src === 'live') { pollCount = 0; renderHealth(); renderTrends(); }
   };
   $('src-replay').addEventListener('click', () => setSource('replay'));
   $('src-live').addEventListener('click', () => setSource('live'));
 
   const poll = async () => {
     try {
-      const r = await fetch('/api/latest', { cache: 'no-store' });
+      const wantHistory = S.src === 'live' && (pollCount++ % 5 === 0 || !LIVE.history.length);
+      const r = await fetch(wantHistory ? '/api/latest?history=1' : '/api/latest', { cache: 'no-store' });
       if (!r.ok) throw new Error(String(r.status));
       const j = await r.json();
       LIVE.reachable = true; LIVE.online = !!j.online; LIVE.age = j.age_s;
       LIVE.data = j.latest || null; LIVE.events = Array.isArray(j.events) ? j.events : [];
+      LIVE.fetchedAt = Date.now();
+      if (Array.isArray(j.history)) { LIVE.history = j.history; renderTrends(); }
     } catch (e) { LIVE.reachable = false; LIVE.online = false; }
     updateSourceUI();
-    if (S.src === 'live') { renderWarnings(false); renderDetections(false); }
+    if (S.src === 'live') { renderWarnings(false); renderDetections(false); renderHealth(); }
     setTimeout(poll, S.src === 'live' ? 1000 : 3000);
   };
 
@@ -996,16 +1042,101 @@ const LAND = [-875,-1500,-875,-900,-875,-300,-875,300,-875,900,-875,1500,-850,-1
     $('yaw-txt').textContent = (Math.abs(yaw) < 1 ? 'Facing forward' : yaw < 0 ? 'Turned left' : 'Turned right') + (d.heading != null ? `, compass ${Math.round(d.heading)}°` : '');
     setVal('mode-val', MODEL[d.mode] || d.mode || '—', !d.mode);
     if (d.batt_pct == null) { setVal('batt-val', 'Not connected', true); setVal('vbat-val', 'Not connected', true); setBar($('batt-bar'), 0); }
-    else { setVal('batt-val', `${Number(d.batt_pct).toFixed(0)} %`); setVal('vbat-val', `${Number(d.batt_v).toFixed(2)} V`); setBar($('batt-bar'), d.batt_pct / 100); }
+    else {
+      const lb = battLevel(d.batt_pct, d.batt_v);
+      setVal('batt-val', `${Number(d.batt_pct).toFixed(0)} %` + (lb.word !== 'Normal' ? ` · ${lb.word}` : ''));
+      setVal('vbat-val', `${Number(d.batt_v).toFixed(2)} V`);
+      $('batt-val').classList.toggle('v-warn', lb.cls === 'st-warn'); $('batt-val').classList.toggle('v-crit', lb.cls === 'st-crit');
+      setBar($('batt-bar'), d.batt_pct / 100);
+    }
     if (d.solar_mw == null) { setVal('solar-val', 'Not connected', true); setVal('isol-val', 'Not connected', true); }
     else { setVal('solar-val', `${(d.solar_mw / 1000).toFixed(2)} W`); setVal('isol-val', `${Number(d.solar_ma).toFixed(0)} mA`); }
     if (d.light_pct == null) setVal('sun-val', 'Not connected', true);
     else setVal('sun-val', d.light_pct >= 30 ? 'Light on top face' : 'Dark on top face');
     if (d.temp_c == null) { setVal('temp-val', 'Not connected', true); setBar($('temp-bar'), 0); }
-    else { setVal('temp-val', `${Number(d.temp_c).toFixed(1)} °C`); setBar($('temp-bar'), (d.temp_c + 10) / 50); }
+    else {
+      const lt = tempLevel(d.temp_c);
+      setVal('temp-val', `${Number(d.temp_c).toFixed(1)} °C` + (lt.word !== 'Normal' ? ` · ${lt.word}` : ''));
+      $('temp-val').classList.toggle('v-warn', lt.cls === 'st-warn'); $('temp-val').classList.toggle('v-crit', lt.cls === 'st-crit');
+      setBar($('temp-bar'), (d.temp_c + 10) / 50);
+    }
     if (d.light_pct == null) { setVal('lux-val', 'Not connected', true); setBar($('lux-bar'), 0); }
     else { setVal('lux-val', `${Math.round(d.light_pct)} %`); setBar($('lux-bar'), d.light_pct / 100); }
   };
+
+  // ---------- thresholds (warning / critical), always shown with a word, not colour alone ----------
+  const LV = { ok: (w = 'Normal') => ({ cls: 'st-ok', word: w }), warn: (w) => ({ cls: 'st-warn', word: w }), crit: (w) => ({ cls: 'st-crit', word: w }), none: (w = 'Not connected') => ({ cls: 'st-none', word: w }) };
+  const battLevel = (pct, v) => pct == null ? LV.none() : (pct < 15 || v < 3.3) ? LV.crit('Critical: low') : (pct < 30 || v < 3.5) ? LV.warn('Low') : LV.ok();
+  const tempLevel = (c) => c == null ? LV.none() : (c > 60 || c < -10) ? LV.crit(c > 60 ? 'Critical: hot' : 'Critical: cold') : (c > 45 || c < 0) ? LV.warn(c > 45 ? 'Warm' : 'Too cold to charge') : LV.ok();
+  const rssiLevel = (r) => r == null ? LV.none('No WiFi data') : r >= -67 ? LV.ok('Good') : r >= -80 ? LV.warn('Fair') : LV.crit('Weak');
+  const ageLevel = (a) => a == null ? LV.crit('No data yet') : a < 3 ? LV.ok('Updating') : a < 10 ? LV.warn('Delayed') : LV.crit('Stale');
+  const liveAge = () => LIVE.age == null ? null : LIVE.age + (Date.now() - LIVE.fetchedAt) / 1000;
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmtUp = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; return `${h}:${pad(m)}:${pad(s % 60)}`; };
+  const fmtAge = (a) => a == null ? '—' : a < 60 ? `${a.toFixed(1)} s ago` : a < 3600 ? `${Math.floor(a / 60)} min ago` : `${(a / 3600).toFixed(1)} h ago`;
+  const tile = (id, value, lv) => { $(id).className = 'htile ' + lv.cls + (id === 'h-link' ? ' link' : ''); $(id + '-v').textContent = value; $(id + '-s').textContent = lv.word; };
+
+  const renderHealth = () => {
+    if (S.src !== 'live') return;
+    const d = LIVE.data || {}, age = liveAge(), stale = age == null || age >= 10;
+    const al = ageLevel(age);
+    tile('h-link', stale ? 'Offline' : age < 3 ? 'Online' : 'Delayed', al);
+    tile('h-age', fmtAge(age), al);
+    tile('h-rssi', d.rssi == null ? '—' : `${d.rssi} dBm`, rssiLevel(d.rssi));
+    const lb = battLevel(d.batt_pct, d.batt_v);
+    tile('h-batt', d.batt_pct == null ? '—' : `${Number(d.batt_pct).toFixed(0)} %`, d.batt_pct == null ? lb : { cls: lb.cls, word: `${lb.word} · ${Number(d.batt_v).toFixed(2)} V` });
+    tile('h-temp', d.temp_c == null ? '—' : `${Number(d.temp_c).toFixed(1)} °C`, tempLevel(d.temp_c));
+    const recent = LIVE.events.filter((e) => Date.now() - evTime(e) < 60000 && (e.sev === 'red' || e.sev === 'orange'));
+    tile('h-mode', MODEL[d.mode] || d.mode || '—', recent.some((e) => e.sev === 'red') ? LV.crit('Collision warning') : recent.length ? LV.warn('Close approach') : LV.ok('No active warning'));
+    tile('h-up', d.uptime_s == null ? '—' : fmtUp(d.uptime_s), { cls: 'st-none', word: d.packets == null ? '' : `${d.packets} sent` });
+    ['health', 'trends', 'sens-card'].forEach((id) => $(id).classList.toggle('is-stale', stale && !!LIVE.data));
+    $('stale-badge').hidden = !(stale && LIVE.data);
+    $('stale-badge').textContent = `Stale: last data ${fmtAge(age)}`;
+  };
+  setInterval(renderHealth, 250);
+
+  // ---------- trend charts (last 5 minutes, from the backend's stored history) ----------
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const drawChart = (canvas, series, o) => {
+    const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 260, h = canvas.clientHeight || 110;
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    const c = canvas.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    const L = 46, R = 6, T = 6, B = 16, pw = w - L - R, ph = h - T - B;
+    const vals = series.flatMap((s) => s.pts.map((p) => p[1]).filter((v) => v != null));
+    let lo = o.min, hi = o.max;
+    if (vals.length) { if (o.autoLo) lo = Math.min(lo, Math.min(...vals)); if (o.autoHi) hi = Math.max(hi, Math.max(...vals) * 1.1); }
+    if (hi <= lo) hi = lo + 1;
+    const X = (t) => L + ((t - o.t0) / (o.t1 - o.t0)) * pw, Y = (v) => T + (1 - (v - lo) / (hi - lo)) * ph;
+    c.strokeStyle = cssVar('--line'); c.lineWidth = 1; c.strokeRect(L + .5, T + .5, pw, ph);
+    c.fillStyle = cssVar('--muted'); c.font = '10px system-ui, sans-serif'; c.textAlign = 'right';
+    c.fillText(o.fmt(hi), L - 4, T + 8); c.fillText(o.fmt(lo), L - 4, T + ph);
+    c.textAlign = 'left'; c.fillText('−5 min', L, h - 3); c.textAlign = 'right'; c.fillText('now', L + pw, h - 3);
+    (o.lines || []).forEach((ln) => { if (ln.v < lo || ln.v > hi) return; c.strokeStyle = cssVar(ln.color); c.setLineDash([4, 3]); c.beginPath(); c.moveTo(L, Y(ln.v)); c.lineTo(L + pw, Y(ln.v)); c.stroke(); c.setLineDash([]); });
+    series.forEach((s) => {
+      c.strokeStyle = s.color; c.lineWidth = 1.8; c.beginPath(); let pen = false;
+      s.pts.forEach(([t, v]) => { if (v == null || t < o.t0) { pen = false; return; } const x = X(t), y = Y(v); if (pen) c.lineTo(x, y); else c.moveTo(x, y); pen = true; });
+      c.stroke();
+    });
+    if (!vals.length) { c.fillStyle = cssVar('--muted'); c.textAlign = 'center'; c.font = '12px system-ui, sans-serif'; c.fillText('No data from this sensor', L + pw / 2, T + ph / 2 + 4); }
+  };
+  const renderTrends = () => {
+    if (S.src !== 'live' || $('trends').hidden) return;
+    const H = LIVE.history.filter((r) => r && r.received_at).map((r) => ({ t: Date.parse(r.received_at), r }));
+    const t1 = H.length ? H[H.length - 1].t : Date.now(), t0 = t1 - 300000;
+    const pts = (f) => H.map(({ t, r }) => [t, f(r)]);
+    const last = H.length ? H[H.length - 1].r : {};
+    const num = (v) => (v == null || Number.isNaN(Number(v)) ? null : Number(v));
+    drawChart($('c-batt'), [{ color: cssVar('--green'), pts: pts((r) => num(r.batt_v)) }], { t0, t1, min: 3.0, max: 4.3, fmt: (v) => v.toFixed(1) + ' V', lines: [{ v: 3.5, color: '--orange' }, { v: 3.3, color: '--red' }] });
+    drawChart($('c-temp'), [{ color: cssVar('--green'), pts: pts((r) => num(r.temp_c)) }], { t0, t1, min: 0, max: 65, autoLo: true, fmt: (v) => v.toFixed(0) + ' °C', lines: [{ v: 45, color: '--orange' }, { v: 60, color: '--red' }] });
+    drawChart($('c-solar'), [{ color: '#e2b714', pts: pts((r) => (r.solar_mw == null ? null : r.solar_mw / 1000)) }], { t0, t1, min: 0, max: 0.5, autoHi: true, fmt: (v) => v.toFixed(2) + ' W' });
+    const us = (i) => pts((r) => (Array.isArray(r.us_cm) && r.us_cm[i] > 0 ? r.us_cm[i] : null));
+    drawChart($('c-us'), [{ color: '#3b82f6', pts: us(0) }, { color: '#14b8a6', pts: us(1) }, { color: '#a855f7', pts: us(2) }], { t0, t1, min: 0, max: 100, autoHi: true, fmt: (v) => v.toFixed(0) + ' cm' });
+    $('c-batt-v').textContent = last.batt_v == null ? 'Not connected' : `${Number(last.batt_v).toFixed(2)} V`;
+    $('c-temp-v').textContent = last.temp_c == null ? 'Not connected' : `${Number(last.temp_c).toFixed(1)} °C`;
+    $('c-solar-v').textContent = last.solar_mw == null ? 'Not connected' : `${(last.solar_mw / 1000).toFixed(2)} W`;
+    $('c-us-v').textContent = Array.isArray(last.us_cm) ? last.us_cm.map((v) => (v > 0 ? `${Math.round(v)}` : '–')).join(' / ') + ' cm' : '—';
+  };
+  window.addEventListener('resize', () => renderTrends());
 
   // ---------- start ----------
   size();
